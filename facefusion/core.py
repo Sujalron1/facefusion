@@ -1,9 +1,9 @@
+import os  # Correct import
+import time # Correct import
 import shutil
 import signal
 import sys
-import os
-import time
-from time import time
+
 
 import numpy
 
