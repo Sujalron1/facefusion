@@ -1,6 +1,8 @@
 import shutil
 import signal
 import sys
+import os
+import time
 from time import time
 
 import numpy
@@ -9,7 +11,8 @@ from facefusion import content_analyser, face_classifier, face_detector, face_la
 from facefusion.args import apply_args, collect_job_args, reduce_step_args
 from facefusion.common_helper import get_first
 from facefusion.content_analyser import analyse_image, analyse_video
-from facefusion.download import os import time import download_file, verify_file import conditional_download_hashes, conditional_download_sources
+from facefusion.download import download_file, verify_file, conditional_download_hashes, conditional_download_sources
+from facefusion import content_analyser, face_classifier, face_detector, face_landmarker, face_masker, face_recognizer, logger, process_manager, state_manager, voice_extractor, wording
 from facefusion.exit_helper import conditional_exit, graceful_exit, hard_exit
 from facefusion.face_analyser import get_average_face, get_many_faces, get_one_face
 from facefusion.face_selector import sort_and_filter_faces
@@ -169,39 +172,37 @@ def force_download() -> ErrorCode:
                 model_hashes = model.get('hashes')
                 model_sources = model.get('sources')
 
-
-                if model_sources: #Only check models that have sources for downloading
+                if model_sources:
                     for model_type, data in model_sources.items():
                         url = data.get('url')
                         file_path = data.get('path')
 
-                        if url and file_path:  #Only add if URL and file path exist
-                            hash_url = None  # Initialize hash values
+                        if url and file_path:
+                            hash_url = None
                             hash_path = None
 
-                            if model_hashes and model_type in model_hashes: #Check if hash exists for the model_type
+                            if model_hashes and model_type in model_hashes:
                                 hash_url = model_hashes[model_type].get('url')
                                 hash_path = model_hashes[model_type].get('path')
 
                             all_models.append((url, file_path, hash_url, hash_path))
 
 
+
     for url, file_path, hash_url, hash_path in all_models:
         if not os.path.exists(file_path):
             try:
-                print(f"Downloading: {url} to {file_path}") #More informative output
+                print(f"Downloading: {url} to {file_path}")
                 download_file(url, file_path)
 
-                if hash_url and hash_path: #Only verify if hashes are available
-
+                if hash_url and hash_path:
                     print(f"Downloading hash: {hash_url} to {hash_path}")
                     download_file(hash_url, hash_path)
 
                     if not verify_file(file_path, hash_path):
                         raise Exception(f"Hash verification failed for {file_path}")
-                    
 
-                time.sleep(5)
+                time.sleep(5) 
 
             except Exception as e:
                 print(f"Error downloading or verifying {url} or {hash_url}: {e}")
