@@ -9,7 +9,7 @@ from facefusion import content_analyser, face_classifier, face_detector, face_la
 from facefusion.args import apply_args, collect_job_args, reduce_step_args
 from facefusion.common_helper import get_first
 from facefusion.content_analyser import analyse_image, analyse_video
-from facefusion.download import conditional_download_hashes, conditional_download_sources
+from facefusion.download import os import time import download_file, verify_file import conditional_download_hashes, conditional_download_sources
 from facefusion.exit_helper import conditional_exit, graceful_exit, hard_exit
 from facefusion.face_analyser import get_average_face, get_many_faces, get_one_face
 from facefusion.face_selector import sort_and_filter_faces
@@ -149,31 +149,67 @@ def conditional_append_reference_faces() -> None:
 
 
 def force_download() -> ErrorCode:
-	download_directory_path = resolve_relative_path('../.assets/models')
-	available_processors = list_directory('facefusion/processors/modules')
-	common_modules =\
-	[
-		content_analyser,
-		face_classifier,
-		face_detector,
-		face_landmarker,
-		face_recognizer,
-		face_masker,
-		voice_extractor
-	]
-	processor_modules = get_processors_modules(available_processors)
+    download_directory_path = resolve_relative_path('../.assets/models')
+    available_processors = list_directory('facefusion/processors/modules')
+    common_modules = [
+        content_analyser,
+        face_classifier,
+        face_detector,
+        face_landmarker,
+        face_recognizer,
+        face_masker,
+        voice_extractor
+    ]
+    processor_modules = get_processors_modules(available_processors)
 
-	for module in common_modules + processor_modules:
-		if hasattr(module, 'MODEL_SET'):
-			for model in module.MODEL_SET.values():
-				model_hashes = model.get('hashes')
-				model_sources = model.get('sources')
+    all_models = []
+    for module in common_modules + processor_modules:
+        if hasattr(module, 'MODEL_SET'):
+            for model_key, model in module.MODEL_SET.items():
+                model_hashes = model.get('hashes')
+                model_sources = model.get('sources')
 
-				if model_hashes and model_sources:
-					if not conditional_download_hashes(download_directory_path, model_hashes) or not conditional_download_sources(download_directory_path, model_sources):
-						return 1
 
-	return 0
+                if model_sources: #Only check models that have sources for downloading
+                    for model_type, data in model_sources.items():
+                        url = data.get('url')
+                        file_path = data.get('path')
+
+                        if url and file_path:  #Only add if URL and file path exist
+                            hash_url = None  # Initialize hash values
+                            hash_path = None
+
+                            if model_hashes and model_type in model_hashes: #Check if hash exists for the model_type
+                                hash_url = model_hashes[model_type].get('url')
+                                hash_path = model_hashes[model_type].get('path')
+
+                            all_models.append((url, file_path, hash_url, hash_path))
+
+
+    for url, file_path, hash_url, hash_path in all_models:
+        if not os.path.exists(file_path):
+            try:
+                print(f"Downloading: {url} to {file_path}") #More informative output
+                download_file(url, file_path)
+
+                if hash_url and hash_path: #Only verify if hashes are available
+
+                    print(f"Downloading hash: {hash_url} to {hash_path}")
+                    download_file(hash_url, hash_path)
+
+                    if not verify_file(file_path, hash_path):
+                        raise Exception(f"Hash verification failed for {file_path}")
+                    
+
+                time.sleep(5)
+
+            except Exception as e:
+                print(f"Error downloading or verifying {url} or {hash_url}: {e}")
+                return 1
+        else:
+            print(f"Skipping download: {file_path} (already exists)")
+
+    return 0
 
 
 def route_job_manager(args : Args) -> ErrorCode:
